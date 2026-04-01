@@ -47,15 +47,21 @@ private:
     // Envelope follower state (per channel)
     float envelope[2] { 0.0f, 0.0f };
 
-    // Attack/release coefficients (computed in prepareToPlay)
-    float attackCoeff  = 0.0f;
-    float releaseCoeff = 0.0f;
+    // Input transformer HPF state (per channel, ~80 Hz roll-off)
+    float inputXfmrState[2] { 0.0f, 0.0f };
 
-    // Compression constants
-    static constexpr float kRatio    = 7.0f;            // ~7:1 (40dB in -> 6dB out)
-    static constexpr float kCompExp  = 6.0f / 7.0f;     // (ratio-1)/ratio
-    static constexpr float kAttackS  = 0.0005f;          // 500 us
-    static constexpr float kReleaseS = 0.7f;             // 700 ms
+    // Sidechain HPF state (per channel, ~18 Hz AC coupling)
+    float scHpfState[2] { 0.0f, 0.0f };
+
+    // Coefficients (computed in prepareToPlay)
+    float attackCoeff     = 0.0f;
+    float releaseCoeff    = 0.0f;
+    float inputXfmrCoeff  = 0.0f;   // input transformer HPF
+    float scHpfCoeff      = 0.0f;   // sidechain AC-coupling HPF
+    float piOverSr        = 0.0f;
+
+    // Compression exponent (ratio-dependent, computed once)
+    static constexpr float kCompExp = 19.0f / 20.0f;  // ratio 20:1
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LocBoxAudioProcessor)
 };

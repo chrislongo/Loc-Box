@@ -78,7 +78,7 @@ LocBoxAudioProcessorEditor::LocBoxAudioProcessorEditor (LocBoxAudioProcessor& p)
     auto setupLabel = [this] (juce::Label& label, const char* text)
     {
         label.setText (text, juce::dontSendNotification);
-        label.setFont (juce::Font (juce::FontOptions().withHeight (10.0f).withStyle ("Bold")));
+        label.setFont (juce::Font (juce::FontOptions().withHeight (12.0f).withStyle ("Bold")));
         label.setColour (juce::Label::textColourId, juce::Colour (0xff111111));
         label.setJustificationType (juce::Justification::centred);
         addAndMakeVisible (label);
@@ -108,8 +108,8 @@ void LocBoxAudioProcessorEditor::paint (juce::Graphics& g)
 
     // Plugin name
     g.setColour (juce::Colour (0xff111111));
-    g.setFont (juce::Font (juce::FontOptions().withHeight (16.0f).withStyle ("Bold")));
-    g.drawText ("Loc-Box", 12, 6, 150, 20, juce::Justification::bottomLeft);
+    g.setFont (juce::Font (juce::FontOptions().withHeight (20.0f).withStyle ("Bold")));
+    g.drawText ("Loc-Box", 12, 4, 150, 24, juce::Justification::bottomLeft);
 }
 
 void LocBoxAudioProcessorEditor::resized()

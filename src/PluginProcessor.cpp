@@ -26,7 +26,7 @@ LocBoxAudioProcessor::createParameterLayout()
     // LIMIT: compression amount (threshold, 0 = off, 100 = heavy)
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "limit", 1 }, "Limit",
-        juce::NormalisableRange<float> (0.0f, 100.0f, 0.01f), 50.0f,
+        juce::NormalisableRange<float> (0.0f, 100.0f, 0.01f), 25.0f,
         juce::AudioParameterFloatAttributes().withLabel (" %")));
 
     // OUTPUT: makeup gain (audio taper)
@@ -41,9 +41,20 @@ LocBoxAudioProcessor::createParameterLayout()
 
 void LocBoxAudioProcessor::prepareToPlay (double sampleRate, int)
 {
-    // Envelope detector coefficients
-    attackCoeff  = std::exp (-1.0f / (static_cast<float> (sampleRate) * kAttackS));
-    releaseCoeff = std::exp (-1.0f / (static_cast<float> (sampleRate) * kReleaseS));
+    const float sr = static_cast<float> (sampleRate);
+    piOverSr = juce::MathConstants<float>::pi / sr;
+
+    // Input transformer HPF at ~80 Hz (cheap transformer LF roll-off)
+    const float xfmrK = std::tan (piOverSr * 80.0f);
+    inputXfmrCoeff = xfmrK / (1.0f + xfmrK);
+
+    // Sidechain HPF at ~18 Hz (2 uF AC-coupling cap in detector path)
+    const float scK = std::tan (piOverSr * 18.0f);
+    scHpfCoeff = scK / (1.0f + scK);
+
+    // Envelope detector coefficients (base values, modulated per-block by limit)
+    attackCoeff  = std::exp (-1.0f / (sr * 0.0005f));
+    releaseCoeff = std::exp (-1.0f / (sr * 0.7f));
 
     const float inp = apvts.getRawParameterValue ("input")->load();
     const float lim = apvts.getRawParameterValue ("limit")->load();
@@ -51,7 +62,7 @@ void LocBoxAudioProcessor::prepareToPlay (double sampleRate, int)
 
     const float normInp    = inp / 100.0f;
     const float initInput  = normInp * normInp * 16.0f;
-    const float threshDB   = -48.0f * (lim / 100.0f);
+    const float threshDB   = -24.0f * (lim / 100.0f);
     const float initThresh = std::pow (10.0f, threshDB / 20.0f);
     const float normOut    = out / 100.0f;
     const float initOutput = normOut * normOut * 16.0f;
@@ -67,7 +78,9 @@ void LocBoxAudioProcessor::prepareToPlay (double sampleRate, int)
         outputGainSmoothed[ch].reset (sampleRate, 0.02);
         outputGainSmoothed[ch].setCurrentAndTargetValue (initOutput);
 
-        envelope[ch] = 0.0f;
+        envelope[ch]       = 0.0f;
+        inputXfmrState[ch] = 0.0f;
+        scHpfState[ch]     = 0.0f;
     }
 }
 
@@ -91,17 +104,26 @@ void LocBoxAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const float lim = apvts.getRawParameterValue ("limit")->load();
     const float out = apvts.getRawParameterValue ("output")->load();
 
-    // Input gain: audio taper (squared), max +12 dB
+    // Input gain: audio taper (squared), max +24 dB
     const float normInp         = inp / 100.0f;
     const float targetInputGain = normInp * normInp * 16.0f;
 
-    // Threshold: 0% limit = 0 dBFS (no limiting), 100% limit = -48 dBFS (heavy)
-    const float threshDB        = -48.0f * (lim / 100.0f);
+    // Threshold: 0% limit = 0 dBFS (no limiting), 100% limit = -24 dBFS (heavy)
+    const float threshDB        = -24.0f * (lim / 100.0f);
     const float targetThreshold = std::pow (10.0f, threshDB / 20.0f);
 
-    // Output gain: audio taper (squared), max +12 dB
+    // Output gain: audio taper (squared), max +24 dB
     const float normOut          = out / 100.0f;
     const float targetOutputGain = normOut * normOut * 16.0f;
+
+    // Attack/release modulated by limit setting (distance selector interaction):
+    // Higher limit -> faster attack (more aggressive), slightly faster release.
+    // Attack: 800 us at limit=0 down to 300 us at limit=100
+    // Release: fixed at 700 ms
+    const float normLim   = lim / 100.0f;
+    const float attackS   = 0.0008f - 0.0005f * normLim;   // 800 us -> 300 us
+    const float sr        = juce::MathConstants<float>::pi / piOverSr;  // recover sample rate
+    const float atkCoeff  = std::exp (-1.0f / (sr * attackS));
 
     const int numChannels = buffer.getNumChannels();
     const int numSamples  = buffer.getNumSamples();
@@ -124,43 +146,54 @@ void LocBoxAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
             float x = data[i] * ig;
 
+            // --- Input transformer ---
+            // Cheap transformer: HPF at ~80 Hz (LF roll-off) + soft saturation.
+            // "The transformers are a huge part of this sound" — Dan Korneff
+            inputXfmrState[chi] += inputXfmrCoeff * (x - inputXfmrState[chi]);
+            x -= inputXfmrState[chi];
+
+            // Input transformer saturation (asymmetric, cheap core)
+            const float xAbs = std::abs (x);
+            if (xAbs > 0.4f)
+            {
+                const float sat   = std::tanh (x);
+                const float blend = juce::jlimit (0.0f, 1.0f, (xAbs - 0.4f) * 2.5f);
+                x = x * (1.0f - blend) + sat * blend;
+            }
+
+            // --- Sidechain with HPF (AC-coupling cap, ~18 Hz) ---
+            // The 2 uF cap in the detector path means the limiter is
+            // less sensitive to sub-bass content.
+            scHpfState[chi] += scHpfCoeff * (x - scHpfState[chi]);
+            const float scSignal = x - scHpfState[chi];
+            const float scAbs    = std::abs (scSignal);
+
             // --- Envelope follower (peak detector) ---
-            // Models the full-wave rectifier + RC network of the Level Loc sidechain.
-            // Attack:  39 ohm into 2 uF -> ~500 us
-            // Release: 1M ohm from 2 uF -> ~700 ms
-            const float absX = std::abs (x);
-            if (absX > envelope[chi])
-                envelope[chi] = absX + attackCoeff * (envelope[chi] - absX);
+            // Attack/release modulated by limit setting (distance selector).
+            if (scAbs > envelope[chi])
+                envelope[chi] = scAbs + atkCoeff * (envelope[chi] - scAbs);
             else
-                envelope[chi] = absX + releaseCoeff * (envelope[chi] - absX);
+                envelope[chi] = scAbs + releaseCoeff * (envelope[chi] - scAbs);
 
             // --- Gain reduction ---
-            // Level Loc spec: 40 dB input change -> ~6 dB output change.
-            // Modelled as feedforward compressor with ratio ~7:1.
-            // gain = (threshold / envelope) ^ ((ratio-1)/ratio)
+            // Brickwall limiter, ratio ~20:1.  The original's "locked" output
+            // behavior is closer to infinity:1; the apparent 40 dB -> 6 dB spec
+            // includes transformer softening.
             float gain = 1.0f;
             if (envelope[chi] > th && th > 1.0e-10f)
                 gain = std::pow (th / envelope[chi], kCompExp);
 
             // --- JFET nonlinearity (2N5458 variable resistor) ---
-            // The FET adds subtle even-harmonic distortion that increases
-            // with gain reduction.  Below ~100 mV it behaves as a linear
-            // variable resistor; above that it transitions to a variable
-            // current source, introducing asymmetric distortion.
+            // Even-harmonic distortion proportional to gain reduction.
             float compressed = x * gain;
             const float grAmount = juce::jlimit (0.0f, 1.0f, 1.0f - gain);
             compressed *= 1.0f + grAmount * 0.12f * compressed;
 
-            // --- Transistor stage soft saturation ---
-            // Models the discrete 2N5088 amplifier stages clipping
-            // when driven hard (3% THD spec).
-            if (std::abs (compressed) > 0.8f)
-            {
-                const float softClip = std::tanh (compressed * 1.25f);
-                const float blend    = juce::jlimit (0.0f, 1.0f,
-                                           (std::abs (compressed) - 0.8f) * 5.0f);
-                compressed = compressed * (1.0f - blend) + softClip * blend;
-            }
+            // --- Output transformer ---
+            // No buffer stage: FET output drives step-up transformer directly.
+            // Saturation varies with gain reduction (impedance changes).
+            const float outDrive = 1.5f + grAmount * 2.0f;
+            compressed = std::tanh (compressed * outDrive) / outDrive;
 
             data[i] = compressed * og;
         }
