@@ -1,3 +1,5 @@
+<img src="docs/corvid.png" width="64" alt="Corvid Audio"/>
+
 # Loc-Box
 
 ![Loc-Box](docs/Loc-Box.png)
