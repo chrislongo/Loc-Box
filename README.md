@@ -65,4 +65,4 @@ auval -v aufx LBOX CVDA
 
 ## License
 
-Copyright Corvid Audio.
+GPL-3.0 -- see [LICENSE](LICENSE).
