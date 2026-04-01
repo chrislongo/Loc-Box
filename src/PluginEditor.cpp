@@ -15,27 +15,25 @@ void BlackKnobLookAndFeel::drawRotarySlider (juce::Graphics& g,
 {
     const float cx = x + width  * 0.5f;
     const float cy = y + height * 0.5f;
-    const float r  = juce::jmin (width, height) * 0.5f - 2.0f;
+    const float r  = juce::jmin (width, height) * 0.5f - 12.0f;
 
-    // Drop shadow
+    // Tick marks
+    constexpr int kNumTicks = 7;
+    g.setColour (juce::Colour (0xff888888));
+    for (int i = 0; i < kNumTicks; ++i)
     {
-        juce::ColourGradient shadow (juce::Colour (0x50000000), cx, cy + r * 0.1f,
-                                     juce::Colours::transparentBlack, cx, cy + r * 1.3f, true);
-        g.setGradientFill (shadow);
-        g.fillEllipse (cx - r - 3.0f, cy - r + 4.0f, (r + 3.0f) * 2.0f, (r + 3.0f) * 2.0f);
+        const float t     = (float) i / (float) (kNumTicks - 1);
+        const float angle = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle);
+        const float sinA  = std::sin (angle);
+        const float cosA  = std::cos (angle);
+        g.drawLine (cx + sinA * (r + 4.0f),  cy - cosA * (r + 4.0f),
+                    cx + sinA * (r + 10.0f), cy - cosA * (r + 10.0f),
+                    1.0f);
     }
 
     // Black body
     g.setColour (juce::Colour (0xff111111));
     g.fillEllipse (cx - r, cy - r, r * 2.0f, r * 2.0f);
-
-    // Subtle top-edge highlight
-    {
-        juce::ColourGradient highlight (juce::Colour (0x25ffffff), cx, cy - r,
-                                        juce::Colours::transparentBlack, cx, cy, false);
-        g.setGradientFill (highlight);
-        g.fillEllipse (cx - r, cy - r, r * 2.0f, r * 2.0f);
-    }
 
     // White indicator line
     {
@@ -66,7 +64,7 @@ LocBoxAudioProcessorEditor::LocBoxAudioProcessorEditor (LocBoxAudioProcessor& p)
       limitAttachment  (p.apvts, "limit",  limitKnob),
       outputAttachment (p.apvts, "output", outputKnob)
 {
-    setSize (320, 200);
+    setSize (320, 230);
 
     juce::Slider* knobs[] = { &inputKnob, &limitKnob, &outputKnob };
     for (auto* knob : knobs)
@@ -86,9 +84,9 @@ LocBoxAudioProcessorEditor::LocBoxAudioProcessorEditor (LocBoxAudioProcessor& p)
         addAndMakeVisible (label);
     };
 
-    setupLabel (inputLabel,  "INPUT");
-    setupLabel (limitLabel,  "LIMIT");
-    setupLabel (outputLabel, "OUTPUT");
+    setupLabel (inputLabel,  "Input");
+    setupLabel (limitLabel,  "Limit");
+    setupLabel (outputLabel, "Output");
 }
 
 LocBoxAudioProcessorEditor::~LocBoxAudioProcessorEditor()
@@ -107,12 +105,17 @@ void LocBoxAudioProcessorEditor::paint (juce::Graphics& g)
                                    juce::Colour (0x18000000), 0.0f, static_cast<float> (getHeight()), false);
     g.setGradientFill (overlay);
     g.fillAll();
+
+    // Plugin name
+    g.setColour (juce::Colour (0xff111111));
+    g.setFont (juce::Font (juce::FontOptions().withHeight (16.0f).withStyle ("Bold")));
+    g.drawText ("Loc-Box", 12, 6, 150, 20, juce::Justification::bottomLeft);
 }
 
 void LocBoxAudioProcessorEditor::resized()
 {
     constexpr int cx[3]  = { 53, 160, 267 };
-    constexpr int r      = 36;
+    constexpr int r      = 48;  // 36 knob body + 12 tick margin
     constexpr int gap    = 4;
     constexpr int labelH = 15;
     constexpr int labelW = 100;

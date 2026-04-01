@@ -1,5 +1,7 @@
 # Loc-Box
 
+![Loc-Box](docs/Loc-Box.png)
+
 A digital emulation of the **Shure Level Loc (M62/M62V)** brickwall limiter, built as an AU/VST3 audio plugin with [JUCE](https://juce.com/).
 
 The Level Loc is a discrete transistor limiter from the late 1960s, originally designed for PA and podium microphone use. It became a cult favorite in music production for its aggressive, pumping compression character.
@@ -9,7 +11,7 @@ The Level Loc is a discrete transistor limiter from the late 1960s, originally d
 | Knob | Range | Description |
 |------|-------|-------------|
 | **INPUT** | 0 -- 100% | Signal level into the limiter. Audio taper, up to +24 dB. |
-| **LIMIT** | 0 -- 100% | Compression amount. At 0% the threshold sits at 0 dBFS (no limiting); at 100% it drops to -48 dBFS (heavy brickwall compression). |
+| **LIMIT** | 0 -- 100% | Compression amount. At 0% the threshold sits at 0 dBFS (no limiting); at 100% it drops to -24 dBFS (heavy brickwall compression). |
 | **OUTPUT** | 0 -- 100% | Makeup gain. Audio taper, up to +24 dB. |
 
 ## What it models

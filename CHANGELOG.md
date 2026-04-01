@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2 — 2026-03-31
+
+- Fix input/output gain structure: unity gain at 12 o'clock (max +24 dB)
+- Add plugin name label to UI
+- Add 7 tick marks around knobs
+- Title-case knob labels (Input, Limit, Output)
+
 ## 0.1 — 2026-03-31
 
 - Initial release
