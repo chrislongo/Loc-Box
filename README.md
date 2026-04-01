@@ -16,10 +16,12 @@ The Level Loc is a discrete transistor limiter from the late 1960s, originally d
 
 ## What it models
 
+- **Input transformer** -- cheap transformer LF roll-off (~80 Hz HPF) and asymmetric soft saturation. Per Dan Korneff: "the transformers are a huge part of this sound."
 - **JFET gain element (2N5458)** -- voltage-controlled variable resistor with level-dependent even-harmonic distortion that increases with gain reduction.
-- **Peak envelope detector** -- full-wave rectifier into an RC network with 500 us attack and 700 ms release, matching the original's 39 ohm / 1M ohm / 2 uF timing components.
-- **Brickwall compression** -- approximately 7:1 ratio (40 dB input change produces ~6 dB output change), per the Shure spec sheet.
-- **Transistor soft saturation** -- models the 2N5088 amplifier stages clipping at high levels (3% THD spec).
+- **Sidechain AC coupling** -- HPF at ~18 Hz from the 2 uF cap in the detector path, so the limiter is less sensitive to sub-bass.
+- **Peak envelope detector** -- full-wave rectifier into an RC network with variable attack (800--300 us, faster at higher limit settings) and 700 ms release.
+- **Brickwall compression** -- ~20:1 ratio. The original's output is "locked" above threshold.
+- **Output transformer** -- saturation that varies with gain reduction. No buffer stage: the FET drives a step-up transformer directly, so impedance changes with compression.
 
 ## Building
 
@@ -39,22 +41,22 @@ cmake --build build --config Release
 ```
 
 Artifacts land in `build/LocBox_artefacts/Release/`:
-- `AU/LocBox.component`
-- `VST3/LocBox.vst3`
-- `Standalone/LocBox.app`
+- `AU/Loc-Box.component`
+- `VST3/Loc-Box.vst3`
+- `Standalone/Loc-Box.app`
 
 ## Install
 
 ```bash
 # AU
-cp -R build/LocBox_artefacts/Release/AU/LocBox.component \
+cp -R build/LocBox_artefacts/Release/AU/Loc-Box.component \
       ~/Library/Audio/Plug-Ins/Components/
-codesign --force --sign "-" ~/Library/Audio/Plug-Ins/Components/LocBox.component
+codesign --force --sign "-" ~/Library/Audio/Plug-Ins/Components/Loc-Box.component
 
 # VST3
-cp -R build/LocBox_artefacts/Release/VST3/LocBox.vst3 \
+cp -R build/LocBox_artefacts/Release/VST3/Loc-Box.vst3 \
       ~/Library/Audio/Plug-Ins/VST3/
-codesign --force --sign "-" ~/Library/Audio/Plug-Ins/VST3/LocBox.vst3
+codesign --force --sign "-" ~/Library/Audio/Plug-Ins/VST3/Loc-Box.vst3
 ```
 
 Validate the AU with:
