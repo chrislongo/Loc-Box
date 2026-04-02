@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 — 2026-04-01
+
+- Fix knob tick marks at 3 and 9 o'clock not being straight (set explicit 270° rotary sweep)
+
 ## 0.3 — 2026-04-01
 
 - Add input transformer model: HPF at ~80 Hz + asymmetric soft saturation

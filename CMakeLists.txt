@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(LocBox VERSION 1.0.0)
+project(LocBox VERSION 0.3.1)
 set(CMAKE_CXX_STANDARD 17)
 
 add_subdirectory(/Users/chris/src/github/JUCE juce)

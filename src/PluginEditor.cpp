@@ -71,6 +71,9 @@ LocBoxAudioProcessorEditor::LocBoxAudioProcessorEditor (LocBoxAudioProcessor& p)
     {
         knob->setSliderStyle (juce::Slider::RotaryVerticalDrag);
         knob->setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
+        knob->setRotaryParameters (juce::MathConstants<float>::pi * 1.25f,
+                                    juce::MathConstants<float>::pi * 2.75f,
+                                    true);
         knob->setLookAndFeel (&blackKnobLAF);
         addAndMakeVisible (knob);
     }
